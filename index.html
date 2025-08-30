@@ -58,7 +58,7 @@ body { margin:0; font-family:'Bangers', cursive; background:black; color:white; 
 .center-top-blank { width:100%; }           /* row 1 */
 .title-row { width:100%; display:flex; align-items:center; justify-content:space-between; padding:0 10px; } /* row 2 */
 .title { flex:1; text-align:center; font-size:5vw; color:#fff; cursor:text; text-shadow:2px 2px 0 #000,-2px 2px 0 #000,2px -2px 0 #000,-2px -2px 0 #000; }
-/* removed .title-btn styling */
+.title-btn { background:transparent; color:black; border:none; font-size:2vw; }
 .center-spacer { width:100%; }              /* row 3 */
 
 /* Timer row: fill the 50% row; fix height and layer above other columns */
@@ -236,30 +236,13 @@ body { margin:0; font-family:'Bangers', cursive; background:black; color:white; 
   }
 </style>
 
+
 <style>
 /* Injected: ensure Spotify control icon stays black */
-#spotifyTogglePlay, #spotifyTogglePlay * {
-  color: #000 !important;
-  -webkit-text-fill-color: #000 !important;
-  fill: #000 !important;
-}
+#spotifyTogglePlay, #spotifyTogglePlay * { color:#000 !important; -webkit-text-fill-color:#000 !important; fill:#000 !important; }
 #spotifyTogglePlay svg { display:block; margin:0 auto; }
 </style>
-<style>
-/* Injected: Keep title on one line within the center column without overlapping */
-.title-row {
-  max-width: 100% !important;
-  overflow: hidden !important;
-}
-.title {
-  display: block !important;
-  max-width: 100% !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important; /* prevent spill into side columns */
-  box-sizing: border-box !important;
-}
-</style>
+
 </head>
 <body id="body">
 <audio id="buzzer" src="buzzer.mp3" preload="auto"></audio>
@@ -324,7 +307,11 @@ body { margin:0; font-family:'Bangers', cursive; background:black; color:white; 
 <!-- CENTER COLUMN -->
 <div class="column center">
   <div class="center-top-blank"></div>
-  <div class="title-row"><div class="title" id="title" contenteditable="true">Mr. Howard's P.E. Class</div></div>
+  <div class="title-row">
+    <button class="title-btn" id="title-decrease">-</button>
+    <div class="title" id="title" contenteditable="true">Mr. Howard's P.E. Class</div>
+    <button class="title-btn" id="title-increase">+</button>
+  </div>
   <div class="center-spacer"></div>
   <div class="timer" id="timer"><span>00:00</span></div>
   <div class="controls">
@@ -361,14 +348,10 @@ body { margin:0; font-family:'Bangers', cursive; background:black; color:white; 
           <button id="toggleFlash" class="settings-btn">Flash: On</button>
           <button id="flashColor" class="settings-btn">Flash Color</button>
           <button id="flashSpeed" class="settings-btn">Speed: M</button>
-                  <button id="spotifyAutoResume" class="settings-btn">Auto-Resume: On</button>
         
-          <button id="titleFontMinus" class="settings-btn">Title −</button>
-          <button id="titleFontPlus" class="settings-btn">Title +</button>
           <button id="spotifyConnect" class="settings-btn">Spotify: Connect</button>
-          <button id="spotifySetClientId" class="settings-btn">Set Client ID</button>
-        
-          <button id="spotifyReconnect" class="settings-btn" style="display:none">Reconnect Spotify</button>
+<button id="spotifySetClientId" class="settings-btn">Set Client ID</button>
+<button id="spotifyAutoResume" class="settings-btn">Auto-Resume: On</button>
         </div>
       </div>
     </div>
@@ -565,7 +548,7 @@ function startTimer(){
       clearInterval(timerInterval); timerInterval=null;
       document.getElementById('startStop').innerText='Start';
       autoFlashMode=false; stopFlashing();
-      if(buzzerEnabled){ try{ pauseSpotifyIfPlaying && pauseSpotifyIfPlaying(); }catch(e){}; document.getElementById('buzzer').play(); }
+      if(buzzerEnabled){ document.getElementById('buzzer').play(); }
     }
   },1000);
 }
@@ -1065,151 +1048,93 @@ document.getElementById('closeSettings').onclick = ()=>{
 
 
 <script>
-// Auto-resume after buzzer ends (robust)
+// --- Spotify Controls (PKCE + Web API) ---
 (function(){
-  function wantAuto(){ try { return (localStorage.getItem('spotifyAutoResume') ?? '1') === '1'; } catch(e){ return true; } }
-  function markIntent(){ try { sessionStorage.setItem('spotifyResumeIntent','1'); } catch(e){} }
-  function clearIntent(){ try { sessionStorage.removeItem('spotifyResumeIntent'); } catch(e){} }
+  const SCOPES = ['user-modify-playback-state','user-read-playback-state'];
+  function getClientId(){ return localStorage.getItem('SPOTIFY_CLIENT_ID') || ''; }
+  function getRedirectUri(){ return localStorage.getItem('SPOTIFY_REDIRECT_URI') || (location.origin + location.pathname); }
 
-  // Attach intent marking to horn button and when timer hits zero (if present)
-  window.addEventListener('DOMContentLoaded', ()=>{
-    const horn = document.getElementById('playHorn');
-    if(horn){
-      const prev = horn.onclick;
-      horn.onclick = function(ev){
-        try{ markIntent(); }catch(e){}
-        if(prev) return prev.call(this, ev);
-      };
-    }
-    // Attach ended handler on buzzer for resume
-    const buzzerEl = document.getElementById('buzzer');
-    if(buzzerEl && !buzzerEl._resumeBound){
-      buzzerEl._resumeBound = true;
-      buzzerEl.addEventListener('ended', async ()=>{
-        try {
-          const intent = sessionStorage.getItem('spotifyResumeIntent') === '1';
-          if(wantAuto() || intent){
-            // Try resume
-            if(typeof api === 'function'){
-              try{ await api('PUT','/me/player/play'); }catch(e){}
-            }
-          }
-        } finally {
-          clearIntent();
-        }
-      });
-    }
-  });
-})();
-</script>
+  function base64urlencode(buf){ return btoa(String.fromCharCode.apply(null, new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  async function sha256(input){ const enc=new TextEncoder().encode(input); const buf=await crypto.subtle.digest('SHA-256',enc); return base64urlencode(buf); }
+  function genCodeVerifier(len=64){ const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'; let out=''; for(let i=0;i<len;i++) out+=chars[Math.floor(Math.random()*chars.length)]; return out; }
 
+  function saveTokens(tokens){ const now=Math.floor(Date.now()/1000); const payload={...tokens, _ts:now}; localStorage.setItem('spotify_tokens', JSON.stringify(payload)); }
+  function getTokens(){ try{ return JSON.parse(localStorage.getItem('spotify_tokens')||'null'); }catch(e){ return null; } }
+  function isExpired(t){ return !t || (t.expires_in && (Math.floor(Date.now()/1000) > (t._ts + t.expires_in - 30))); }
 
-<script>
-// Wire Auto-Resume toggle
-(function(){
-  function getOn(){ try { return (localStorage.getItem('spotifyAutoResume') ?? '1') === '1'; } catch(e){ return true; } }
-  function setOn(v){ try { localStorage.setItem('spotifyAutoResume', v ? '1':'0'); } catch(e){} }
-  window.addEventListener('DOMContentLoaded', ()=>{
-    const btn = document.getElementById('spotifyAutoResume');
-    if(!btn) return;
-    const apply = ()=>{ btn.textContent = 'Auto-Resume: ' + (getOn() ? 'On' : 'Off'); };
-    apply();
-    btn.addEventListener('click', ()=>{
-      setOn(!getOn());
-      apply();
-      try{ /* light feedback */ btn.style.transform='scale(0.98)'; setTimeout(()=>btn.style.transform='',110); }catch(e){}
-    });
-  });
-})();
-</script>
-
-
-<script>
-// --- Title Font Size Controls (Settings Toolbox) ---
-(function(){
-  const titleEl = document.getElementById('title');
-  if(!titleEl) return;
-
-  // restore from localStorage if present
-  const saved = localStorage.getItem('titleFontPt');
-  if(saved){
-    const pt = parseInt(saved, 10);
-    if(!isNaN(pt)) titleEl.style.setProperty('font-size', pt + 'pt', 'important');
+  async function refreshAccessToken(){
+    const t = getTokens(); if(!t || !t.refresh_token) return null;
+    const params = new URLSearchParams();
+    params.set('grant_type','refresh_token'); params.set('refresh_token',t.refresh_token); params.set('client_id', getClientId());
+    const res = await fetch('https://accounts.spotify.com/api/token',{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:params });
+    if(!res.ok) throw new Error('Refresh failed'); const data=await res.json();
+    const merged={...t,...data,_ts:Math.floor(Date.now()/1000)}; saveTokens(merged); return merged.access_token;
   }
 
-  function getCurrentPt(){
-    const stored = parseInt(localStorage.getItem('titleFontPt')||'', 10);
-    if(!isNaN(stored)) return stored;
-    const px = parseFloat(getComputedStyle(titleEl).fontSize) || 32;
-    return Math.round(px * 72 / 96);
-  }
-
-  function setPt(pt){
-    const clamped = Math.max(10, Math.min(200, pt));
-    titleEl.style.setProperty('font-size', clamped + 'pt', 'important');
-    localStorage.setItem('titleFontPt', String(clamped));
-  }
-
-  function adjust(delta){ if(!titleEl) return; setPt(getCurrentPt() + delta); }
-
-  window.addEventListener('DOMContentLoaded', ()=>{
-    const minus = document.getElementById('titleFontMinus');
-    const plus  = document.getElementById('titleFontPlus');
-    if(minus) minus.addEventListener('click', ()=> adjust(-5));
-    if(plus)  plus .addEventListener('click', ()=> adjust(+5));
-  });
-})();
-</script>
-
-
-<script>
-// Minimal storage for Spotify Client ID (until main Spotify block is present)
-(function(){
-  window.addEventListener('DOMContentLoaded', ()=>{
-    const setIdBtn = document.getElementById('spotifySetClientId');
-    if(setIdBtn){
-      setIdBtn.addEventListener('click', ()=>{
-        const cur = localStorage.getItem('SPOTIFY_CLIENT_ID') || '';
-        const next = prompt('Enter your Spotify Client ID:', cur);
-        if(next){ localStorage.setItem('SPOTIFY_CLIENT_ID', next.trim()); alert('Saved.'); }
-      });
+  async function getAccessToken(){
+    let t = getTokens();
+    if(t && !isExpired(t)) return t.access_token;
+    if(t && t.refresh_token) return await refreshAccessToken();
+    const params = new URLSearchParams(location.search);
+    const code = params.get('code'); const storedVerifier = sessionStorage.getItem('spotify_code_verifier');
+    if(code && storedVerifier){
+      const body=new URLSearchParams();
+      body.set('grant_type','authorization_code'); body.set('code',code); body.set('redirect_uri',getRedirectUri()); body.set('client_id',getClientId()); body.set('code_verifier',storedVerifier);
+      const res = await fetch('https://accounts.spotify.com/api/token',{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
+      if(res.ok){ const data=await res.json(); saveTokens(data); try{ updateSpotifyUI(); }catch(e){}; const url=new URL(location.href); url.searchParams.delete('code'); url.searchParams.delete('state'); history.replaceState(null,'',url.toString()); return data.access_token; }
+      alert('Spotify token exchange failed. Check Client ID and Redirect URI.'); return null;
     }
-  });
-})();
-</script>
-
-
-<script>
-// Auto-fit the title on first load so it fits on one line in the center column.
-(function(){
-  function fitTitleToOneLine(opts){
-    const el = document.getElementById('title');
-    if(!el) return;
-    const container = el.parentElement || el;
-    const min = (opts && opts.min) || 10;
-    const max = (opts && opts.max) || 200;
-    // Ensure single line + no overflow
-    el.style.whiteSpace = 'nowrap';
-    el.style.overflow = 'hidden';
-    el.style.textOverflow = 'ellipsis';
-    // Binary search for largest pt size that fits container width
-    let lo = min, hi = max, best = min;
-    for(let i=0;i<12;i++){ // ~log2(200) steps
-      const mid = Math.floor((lo + hi) / 2);
-      el.style.setProperty('font-size', mid + 'pt', 'important');
-      // Force reflow and check
-      const fits = el.scrollWidth <= container.clientWidth;
-      if(fits){ best = mid; lo = mid + 1; } else { hi = mid - 1; }
-    }
-    el.style.setProperty('font-size', best + 'pt', 'important');
-    try { localStorage.setItem('titleFontPt', String(best)); } catch(e){}
+    return null;
   }
-  window.addEventListener('DOMContentLoaded', ()=>{
-    try {
-      // Only run if user hasn't already chosen a size
-      if(!localStorage.getItem('titleFontPt')) fitTitleToOneLine({min: 10, max: 200});
-    } catch(e){}
+
+  async function api(method, path, body){
+    const token = await getAccessToken(); if(!token) throw new Error('Not authenticated with Spotify');
+    const res = await fetch('https://api.spotify.com/v1'+path,{ method, headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined });
+    if(res.status===401){ await refreshAccessToken(); return api(method,path,body); } return res;
+  }
+
+  async function startAuth(){
+    const id=getClientId(); if(!id){ alert('Set your Spotify Client ID first (Settings → Set Client ID).'); return; }
+    const verifier = genCodeVerifier(); const challenge = await sha256(verifier); sessionStorage.setItem('spotify_code_verifier', verifier);
+    const auth=new URL('https://accounts.spotify.com/authorize'); auth.searchParams.set('client_id',id); auth.searchParams.set('response_type','code'); auth.searchParams.set('redirect_uri',getRedirectUri()); auth.searchParams.set('code_challenge_method','S256'); auth.searchParams.set('code_challenge',challenge); auth.searchParams.set('scope',SCOPES.join(' ')); auth.searchParams.set('show_dialog','true');
+    location.assign(auth.toString());
+  }
+
+  async function togglePlayPause(){
+    let res=await api('GET','/me/player'); if(res.status===204){ alert('No active device. Open Spotify and start any track once, then try again.'); return; }
+    const state=await res.json().catch(()=>null); if(state && state.is_playing){ await api('PUT','/me/player/pause'); updateSpotifyIcon(false); } else { await api('PUT','/me/player/play'); updateSpotifyIcon(true); }
+  }
+
+  async function pauseSpotifyIfPlaying(){
+    try{ let res=await api('GET','/me/player'); if(res && res.status===204) return; const state=await res.json().catch(()=>null); if(state && state.is_playing){ await api('PUT','/me/player/pause'); sessionStorage.setItem('spotifyPausedByBuzzer','1'); updateSpotifyIcon(false); } }catch(e){}
+  }
+
+  function playIconSVG(){ return '<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22"><polygon points="4,3 20,12 4,21" fill="currentColor"/></svg>'; }
+  function pauseIconSVG(){ return '<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22"><rect x="5" y="3" width="6" height="18" fill="currentColor"/><rect x="13" y="3" width="6" height="18" fill="currentColor"/></svg>'; }
+  function updateSpotifyIcon(isPlaying){ const btn=document.getElementById('spotifyTogglePlay'); if(btn) btn.innerHTML = isPlaying ? pauseIconSVG() : playIconSVG(); }
+  async function refreshSpotifyIcon(){ try{ let res=await api('GET','/me/player'); if(!res || res.status===204){ updateSpotifyIcon(false); return; } const st=await res.json().catch(()=>null); updateSpotifyIcon(!!(st&&st.is_playing)); } catch(e){ updateSpotifyIcon(false); } }
+  let _poll=null; function startSpotifyPolling(){ if(_poll) return; _poll=setInterval(refreshSpotifyIcon,5000); document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refreshSpotifyIcon(); }); setTimeout(refreshSpotifyIcon,800); }
+
+  async function updateSpotifyUI(){ const connectBtn=document.getElementById('spotifyConnect'); const reconnectBtn=document.getElementById('spotifyReconnect'); let ok=false; try{ ok=!!(await getAccessToken()); }catch(e){ ok=false; } if(connectBtn) connectBtn.style.display = ok ? 'none':''; if(reconnectBtn) reconnectBtn.style.display = ok ? 'none':''; }
+
+  window.addEventListener('DOMContentLoaded',()=>{
+    startSpotifyPolling(); updateSpotifyUI().catch(()=>{});
+    const connectBtn=document.getElementById('spotifyConnect'); const reconnectBtn=document.getElementById('spotifyReconnect'); const toggleBtn=document.getElementById('spotifyTogglePlay'); const setIdBtn=document.getElementById('spotifySetClientId'); const copyBtn=document.getElementById('spotifyCopyRedirect'); const setRedBtn=document.getElementById('spotifySetRedirect');
+    if(connectBtn) connectBtn.addEventListener('click', startAuth);
+    if(reconnectBtn) reconnectBtn.addEventListener('click', startAuth);
+    if(toggleBtn)  toggleBtn.addEventListener('click', async ()=>{ try{ await togglePlayPause(); }catch(e){} setTimeout(refreshSpotifyIcon,300); });
+    if(setIdBtn){ setIdBtn.addEventListener('click', ()=>{ const cur=getClientId(); const next=prompt('Enter your Spotify Client ID:', cur); if(next){ localStorage.setItem('SPOTIFY_CLIENT_ID', next.trim()); alert('Saved. Now tap Spotify: Connect.'); } }); }
+    if(copyBtn){ copyBtn.addEventListener('click', async ()=>{ const exact=getRedirectUri(); try{ await navigator.clipboard.writeText(exact); alert('Copied:\\n'+exact+'\\n\\nAlso add with index.html'); }catch(e){ alert('Redirect URL:\\n'+exact+'\\n\\nAlso add with index.html'); } }); }
+    if(setRedBtn){ setRedBtn.addEventListener('click', ()=>{ const cur=getRedirectUri(); const next=prompt('Redirect URL (must match Spotify app):', cur); if(next){ localStorage.setItem('SPOTIFY_REDIRECT_URI', next.trim()); alert('Saved Redirect.'); } }); }
   });
+
+  window.addEventListener('DOMContentLoaded',()=>{
+    const buzzerEl=document.getElementById('buzzer'); const autoBtn=document.getElementById('spotifyAutoResume');
+    if(autoBtn){ const on=(localStorage.getItem('spotifyAutoResume') ?? '1') === '1'; autoBtn.textContent='Auto-Resume: ' + (on?'On':'Off'); autoBtn.addEventListener('click', ()=>{ const cur=(localStorage.getItem('spotifyAutoResume') ?? '1')==='1'; const next=!cur; localStorage.setItem('spotifyAutoResume', next?'1':'0'); autoBtn.textContent='Auto-Resume: ' + (next?'On':'Off'); }); }
+    if(buzzerEl && !buzzerEl._resumeBound){ buzzerEl._resumeBound=true; buzzerEl.addEventListener('ended', async ()=>{ try{ const want=(localStorage.getItem('spotifyAutoResume') ?? '1')==='1'; const pausedByBuzzer=sessionStorage.getItem('spotifyPausedByBuzzer')==='1'; if(want && pausedByBuzzer){ await new Promise(r=>setTimeout(r,150)); await api('PUT','/me/player/play'); updateSpotifyIcon(true); } }catch(e){} finally { sessionStorage.removeItem('spotifyPausedByBuzzer'); } }); }
+  });
+
+  window._spotifyDebug = { getAccessToken, updateSpotifyUI, refreshSpotifyIcon, startAuth };
 })();
 </script>
 
