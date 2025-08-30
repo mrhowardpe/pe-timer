@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mr. Howard's PE Class</title>
+<link rel="manifest" href="manifest.json?v=1756479446">
+<link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="apple-touch-icon" href="P.E. 2.0.png?v=1756479446">
+<style>
+:root { --panel:#111; }
+* { box-sizing:border-box; }
+html,body { height:100%; }
+body { margin:0; font-family:'Bangers', cursive; background:black; color:white; display:flex; }
+.column { display:flex; flex-direction:column; height:100vh; background:var(--panel); position:relative; z-index:1; }
+.left  { width:27%; padding-left:3%;  padding-right:2%; }
+.right { width:27%; padding-right:3%; padding-left:2%; }
+
+/* Center is a 5-row grid and layered above the sides */
+.center {
+  width:46%;
+  display:grid;
+  grid-template-rows: 7.5% 10% 5% 50% 27.5%;
+  position:relative;
+  z-index:3; /* ensure timer sits above left/right columns */
+}
+
+/* Left/Right column content */
+.blank-top,.blank-bottom { height:7.5%; background:inherit; }
+.team-slot { height:28%; margin:2px; display:flex; justify-content:center; align-items:center; }
+.team-card { width:96%; height:95%; border:2px solid #000; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; background:inherit; }
+.card-buttons { height:20%; display:flex; gap:4px; padding:4px; }
+.card-buttons button { flex:1; border:none; background:inherit; color:black; border-radius:6px; font-family:'Bangers', cursive; font-size:1.2vw; }
+.team-name { height:35%; display:flex; align-items:center; justify-content:center; font-size:4vw; color:#fff; text-shadow:2px 2px 0 #000,-2px 2px 0 #000,2px -2px 0 #000,-2px -2px 0 #000; }
+.team-name[contenteditable="true"] { outline:none; }
+.score-area {
+  height: 45%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+ width:100%; padding: 0 8px;}
+.score { font-size:6vw; min-width:60px; text-align:center; color:#fff; cursor:pointer; text-shadow:2px 2px 0 #000,-2px 2px 0 #000,2px -2px 0 #000,-2px -2px 0 #000;  flex:1;}
+.score-btn {
+  font-size: 4vw;
+  border: none;
+  background: inherit;
+  color: black;
+  border-radius: 10px;
+  padding: 12px 18px;
+  min-width: 64px;
+  min-height: 64px;
+}
+
+/* Center grid rows */
+.center-top-blank { width:100%; }           /* row 1 */
+.title-row { width:100%; display:flex; align-items:center; justify-content:space-between; padding:0 10px; } /* row 2 */
+.title { flex:1; text-align:center; font-size:5vw; color:#fff; cursor:text; text-shadow:2px 2px 0 #000,-2px 2px 0 #000,2px -2px 0 #000,-2px -2px 0 #000; }
+/* removed .title-btn styling */
+.center-spacer { width:100%; }              /* row 3 */
+
+/* Timer row: fill the 50% row; fix height and layer above other columns */
+.timer {
+  width:100%; height:100%;
+  display:flex; align-items:flex-end; justify-content:center;
+  cursor:pointer; padding-bottom:6px;
+  position:relative; z-index:5; /* above everything */
+  overflow:visible;
+}
+.timer span {
+  line-height:1;
+  color:#fff;
+  text-shadow:2px 2px 0 #000,-2px 2px 0 #000,2px -2px 0 #000,-2px -2px 0 #000;
+  will-change: transform; /* keep rendering smooth */
+}
+
+/* Controls row */
+.controls { width:100%; height:100%; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; padding-bottom:8px; }
+.button-row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+
+
+
+.controls button {
+  font-family: 'Bangers', cursive !important;
+  font-size: clamp(16px, 2vw, 22px) !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+}
+
+
+
+#settingsModal .button-row button { font-family:'Bangers', cursive; border:none; border-radius:10px; padding:10px 14px; font-size:clamp(18px, 2.6vw, 28px); min-height:48px; min-width:48px; display:inline-flex; align-items:center; gap:8px; }
+#settingsModal #closeSettings { font-family:'Bangers', cursive; }
+
+/* Color toolbox */
+#colorToolbox { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:10001;  z-index: 20000 !important;}
+.toolbox-card{ background:#222; border-radius:14px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.6); width:min(92vw, 680px); }
+.toolbox-title{ text-align:center; font-size:2vw; color:#fff; }
+.palette-wrap { max-height: 50vh; overflow:auto; padding:6px; border-radius:10px; background:#111; }
+.toolbox-row{ display:grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap:10px; margin:12px 0; }
+.swatch{ width:44px; height:44px; border-radius:8px; border:2px solid #000; cursor:pointer; }
+.toolbox-actions{ display:flex; gap:12px; justify-content:center; align-items:center; }
+.toolbox-actions input{ font-family:monospace; padding:8px; border-radius:8px; border:none; width:140px; }
+.toolbox-actions button{ font-family:'Bangers', cursive; border:none; border-radius:10px; padding:10px 14px; }
+
+.icon { width:1.2em; height:1.2em; display:inline-block; }
+.icon svg { width:1em; height:1em; display:block; }
+
+#settingsModal .button-row button {
+  font-family:'Bangers', cursive;
+  border:none;
+  border-radius:10px;
+  padding:10px 14px;
+  font-size:clamp(18px,2.6vw,28px);
+  min-height:48px;
+  min-width:48px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+}
+
+
+
+/* Settings bottom sheet + button styling */
+#settingsModal { position:fixed; inset:0; display:none; background:rgba(0,0,0,.55); z-index:9998; align-items:flex-end; justify-content:center; }
+#settingsModal .sheet {
+  width:100%;
+  max-width:100%;
+  background:#222;
+  color:#fff;
+  border-radius:16px 16px 0 0;
+  box-shadow:0 -10px 30px rgba(0,0,0,.6);
+  padding:16px;
+  max-height:80dvh;
+  overflow:auto;
+  transform: translateY(100%);
+  animation: settings-slide-up .25s ease-out forwards;
+}
+@keyframes settings-slide-up { to { transform: translateY(0); } }
+
+/* Match .controls buttons look and feel */
+
+#settingsModal .button-row button,
+.toolbox-actions button {
+  background: white !important;
+  color: black !important;
+  border: 2px solid #000 !important;
+  border-radius: 10px !important;
+  text-shadow: none !important;
+}
+
+
+
+/* --- iPad fixes --- */
+
+/* 1) Regular control buttons: always black text (avoid iOS Safari blue) */
+.controls button {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+}
+
+/* 2) Team card: keep button text legible and prevent shrinking */
+.card-buttons button {
+  font-size: clamp(14px, 1.6vw, 20px) !important;
+  padding: 6px 8px !important;
+}
+
+/* Team name and score size floors for iPad */
+.team-name { font-size: clamp(18px, 3.4vw, 42px) !important; }
+.score     { font-size: clamp(22px, 6vw, 72px) !important; }
+.score-btn { font-size: clamp(18px, 3.8vw, 44px) !important; }
+
+/* 3) Timer: shift left a touch and avoid clipping on right */
+.timer-area { overflow: visible !important; }
+.timer, #timer, #timerDisplay {
+  transform: translateX(-3%) !important;
+  padding-right: 4% !important;
+}
+
+
+/* Injected by ChatGPT: extra breathing room on timer for iPad */
+.timer  { padding-right: 2.2vw !important; }
+.timer span { padding-right: 0.7ch; }
+
+/* Injected by ChatGPT: centered timer (dynamic JS nudge) */
+.timer span { will-change: transform; }
+
+/* Injected by ChatGPT: larger, bolder team-card buttons for iPad */
+.card-buttons { gap: 8px; }
+.card-buttons button {
+  font-weight: 700;
+  font-size: clamp(16px, 2.2vw, 28px);
+  padding: 10px 14px;
+  min-height: 48px;
+  border: 2px solid #000 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.5);
+  touch-action: manipulation;
+}
+
+/* Injected by ChatGPT: team-card buttons slightly larger, no outline */
+.card-buttons { gap: 6px !important; }
+.card-buttons button {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-weight: 500 !important; /* back off the heavy bold */
+  font-size: clamp(14px, 1.8vw, 24px) !important; /* slight increase over original */
+  padding: 8px 12px !important; /* modestly larger tap target */
+  min-height: 44px !important;  /* iPad-friendly without crowding */
+  touch-action: manipulation;
+}
+</style>
+
+<!-- Injected by ChatGPT: title one-line and preset size -->
+<style>
+  .title { font-size: 4.2vw !important; white-space: nowrap; }
+</style>
+
+
+<!-- Injected by ChatGPT: timer clipping + iPad nudge fixes -->
+<style>
+  .center { overflow: visible !important; }
+  .timer  { overflow: visible !important; padding-right: 0.9vw; }
+  .timer span {
+    display: inline-block;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Nudge timer left a bit on iPad widths */
+  @media (max-width: 1366px) {
+    .timer span { }
+  }
+</style>
+
+<style>
+/* Injected: ensure Spotify control icon stays black */
+#spotifyTogglePlay, #spotifyTogglePlay * {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  fill: #000 !important;
+}
+#spotifyTogglePlay svg { display:block; margin:0 auto; }
+</style>
+<style>
+/* Injected: Keep title on one line within the center column without overlapping */
+.title-row {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+.title {
+  display: block !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important; /* prevent spill into side columns */
+  box-sizing: border-box !important;
+}
+</style>
+</head>
+<body id="body">
+<audio id="buzzer" src="buzzer.mp3" preload="auto"></audio>
+
+<!-- Color toolbox -->
+<div id="colorToolbox" aria-modal="true" role="dialog">
+  <div class="toolbox-card">
+    <div class="toolbox-title" id="toolboxTitle">Pick a color</div>
+    <div class="palette-wrap">
+      <div class="toolbox-row" id="swatches"></div>
+    </div>
+    <div class="toolbox-actions">
+      <input id="hexInput" placeholder="#RRGGBB" maxlength="7">
+      <button id="applyHex">Apply</button>
+      <button id="closeToolbox">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Score Editor Modal (Keypad) -->
+<div id="scoreEditor" aria-modal="true" role="dialog" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); z-index:10000;">
+  <div style="background:#222; color:#fff; padding:16px; border-radius:14px; width:min(92vw, 460px); box-shadow:0 10px 30px rgba(0,0,0,.6);">
+    <div style="text-align:center; font-size:2vw; margin-bottom:10px;">Set Score</div>
+    <div style="display:flex; justify-content:center; margin-bottom:10px;">
+      <input id="scoreInput" type="text" inputmode="numeric" pattern="[0-9-]*" style="width:200px; font-size:28px; padding:8px; border-radius:8px; border:none; text-align:center;">
+    </div>
+    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:10px;">
+      <button class="kp" data-k="7">7</button>
+      <button class="kp" data-k="8">8</button>
+      <button class="kp" data-k="9">9</button>
+      <button class="kp" data-k="4">4</button>
+      <button class="kp" data-k="5">5</button>
+      <button class="kp" data-k="6">6</button>
+      <button class="kp" data-k="1">1</button>
+      <button class="kp" data-k="2">2</button>
+      <button class="kp" data-k="3">3</button>
+      <button class="kp" data-k="0" style="grid-column: span 2;">0</button>
+      <button class="kp" id="kp-back">⌫</button>
+    </div>
+    <div style="display:flex; gap:10px; justify-content:center; margin-bottom:10px;">
+      <button class="kp" id="kp-sign">±</button>
+      <button class="kp" id="kp-minus1">-1</button>
+      <button class="kp" id="kp-plus1">+1</button>
+      <button class="kp" id="kp-clear">Clear</button>
+    </div>
+    <div style="display:flex; gap:12px; justify-content:center;">
+      <button id="scoreCancel" style="font-family:'Bangers', cursive; border:none; border-radius:10px; padding:10px 14px;">Cancel</button>
+      <button id="scoreSave" style="font-family:'Bangers', cursive; border:none; border-radius:10px; padding:10px 14px;">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEFT COLUMN -->
+<div class="column left">
+  <div class="blank-top"></div>
+  <div class="team-slot" id="team3"></div>
+  <div class="team-slot" id="team1"></div>
+  <div class="team-slot" id="team5"></div>
+  <div class="blank-bottom"></div>
+</div>
+
+<!-- CENTER COLUMN -->
+<div class="column center">
+  <div class="center-top-blank"></div>
+  <div class="title-row"><div class="title" id="title" contenteditable="true">Mr. Howard's P.E. Class</div></div>
+  <div class="center-spacer"></div>
+  <div class="timer" id="timer"><span>00:00</span></div>
+  <div class="controls">
+    <div class="button-row" id="row1">
+  <button id="startStop">Start</button>
+  <button id="reset">Reset</button>
+  <button id="addTeam">Add Team</button>
+  <button id="openSettings">Settings</button>
+</div>
+    <div class="button-row" id="row2">
+      <button id="preset30">30s</button>
+      <button id="preset60">1 Min</button>
+      <button id="preset120">2 Min</button>
+      <button id="preset180">3 Min</button>
+      <button id="preset300">5 Min</button>
+      <button id="spotifyTogglePlay" aria-label="Spotify Play/Pause"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" focusable="false"><polygon points="4,3 20,12 4,21" fill="currentColor"/></svg></button>
+    </div>
+    </div>
+  </div>
+</div>
+
+
+    <!-- Settings Toolbox Modal -->
+    <div id="settingsModal" style="position:fixed; inset:0; display:none; background:rgba(0,0,0,.55); z-index:10000; display:none; align-items:flex-end; justify-content:center;">
+      <div class="sheet" style="width:100%; max-width:100%; background:#222; color:#fff; border-radius:16px 16px 0 0; padding:20px; box-shadow:0 -10px 30px rgba(0,0,0,.6);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div style="font-size:clamp(22px,4vw,34px);">Settings</div>
+          <button id="closeSettings" class="settings-btn">Close</button>
+        </div>
+        <div class="button-row settings-buttons">
+          <button id="background" class="settings-btn">Background</button>
+          <button id="playHorn" class="settings-btn">Horn</button>
+          <button id="toggleBuzzer" class="settings-btn">Buzzer: On</button>
+          <button id="toggleFlash" class="settings-btn">Flash: On</button>
+          <button id="flashColor" class="settings-btn">Flash Color</button>
+          <button id="flashSpeed" class="settings-btn">Speed: M</button>
+                  <button id="spotifyAutoResume" class="settings-btn">Auto-Resume: On</button>
+        
+          <button id="titleFontMinus" class="settings-btn">Title −</button>
+          <button id="titleFontPlus" class="settings-btn">Title +</button>
+          <button id="spotifyConnect" class="settings-btn">Spotify: Connect</button>
+          <button id="spotifySetClientId" class="settings-btn">Set Client ID</button>
+        
+          <button id="spotifyReconnect" class="settings-btn" style="display:none">Reconnect Spotify</button>
+        </div>
+      </div>
+    </div>
+    
+<!-- RIGHT COLUMN -->
+<div class="column right">
+  <div class="blank-top"></div>
+  <div class="team-slot" id="team4"></div>
+  <div class="team-slot" id="team2"></div>
+  <div class="team-slot" id="team6"></div>
+  <div class="blank-bottom"></div>
+</div>
+
+<script>
+
+// --- Hold-to-confirm helper for risky buttons ---
+function addHoldToConfirm(btn, onConfirm, holdMs = 800) {
+  let holdTimer = null, startTs = 0, rafId = null;
+  function paintProgress(){
+    const pct = Math.min(1, (Date.now() - startTs) / holdMs);
+    btn.style.backgroundImage = `linear-gradient(to right, rgba(255,0,0,0.35) ${pct*100}%, transparent ${pct*100}%)`;
+    if (pct < 1) rafId = requestAnimationFrame(paintProgress);
+  }
+  function begin(){ if(holdTimer) return; startTs = Date.now(); paintProgress(); holdTimer = setTimeout(()=>{ cleanup(); onConfirm(); }, holdMs); }
+  function cancel(){ if(!holdTimer) return; cleanup(); }
+  function cleanup(){ clearTimeout(holdTimer); holdTimer=null; cancelAnimationFrame(rafId); rafId=null; btn.style.backgroundImage=''; }
+  btn.addEventListener('mousedown', (e)=>{ e.preventDefault(); begin(); });
+  btn.addEventListener('mouseup', cancel);
+  btn.addEventListener('mouseleave', cancel);
+  btn.addEventListener('touchstart', ()=>begin(), { passive:true });
+  btn.addEventListener('touchend', cancel, { passive:true });
+  btn.addEventListener('touchcancel', cancel, { passive:true });
+  btn.title = 'Press and hold to confirm';
+}
+// --- end helper ---
+
+/* ---------- State ---------- */
+let timerSeconds=0, timerInterval=null, teamCount=0, lastSetTime=0;
+let buzzerEnabled=true, flashEnabled=true;
+let flashColor='#FFFFFF', flashSpeed='M', flashingInterval=null;
+let autoFlashMode=false;
+let scoreEditor=null, scoreInput=null, scoreSaveBtn=null, scoreCancelBtn=null, scoreTargetEl=null;
+let TIMER_FONT_PX=0;
+
+/* ---------- Timer formatting ---------- */
+
+/* ---------- Team Card Fit Helpers ---------- */
+function fitTextToBox(el, opts={}){
+  if(!el) return;
+  const minPx = opts.min || 12;
+  const maxPx = opts.max || 72;
+  const singleLine = !!opts.singleLine;
+  const pad = opts.pad || 0.98;
+
+  const rect = el.getBoundingClientRect();
+  if(!rect.width || !rect.height) return;
+
+  const ghost = document.createElement('div');
+  const cs = getComputedStyle(el);
+  ghost.textContent = el.textContent || el.innerText || '';
+  ghost.style.position = 'absolute';
+  ghost.style.left = '-9999px';
+  ghost.style.top = '-9999px';
+  ghost.style.whiteSpace = singleLine ? 'nowrap' : 'normal';
+  ghost.style.lineHeight = cs.lineHeight === 'normal' ? '1.1' : cs.lineHeight;
+  ghost.style.fontFamily = cs.fontFamily;
+  ghost.style.textShadow = cs.textShadow;
+  ghost.style.letterSpacing = cs.letterSpacing;
+  ghost.style.fontWeight = cs.fontWeight;
+  ghost.style.color = cs.color;
+  ghost.style.width = singleLine ? 'auto' : Math.floor(rect.width * pad) + 'px';
+  document.body.appendChild(ghost);
+
+  const maxW = Math.floor(rect.width * pad);
+  const maxH = Math.floor(rect.height * pad);
+  let lo = minPx, hi = maxPx, best = minPx;
+  for(let i=0;i<18;i++){
+    const mid = Math.floor((lo+hi)/2);
+    ghost.style.fontSize = mid + 'px';
+    const fitsW = ghost.scrollWidth <= maxW;
+    const fitsH = ghost.scrollHeight <= maxH;
+    const fits = (singleLine ? fitsW : true) && fitsH;
+    if(fits){ best = mid; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  el.style.fontSize = best + 'px';
+  document.body.removeChild(ghost);
+}
+
+function fitTeamCard(card){
+  if(!card) return;
+  const nameEl = card.querySelector('.team-name');
+  const scoreEl = card.querySelector('.score');
+  fitTextToBox(nameEl, {min:16, max:56, singleLine:false, pad:0.96});
+  fitTextToBox(scoreEl, {min:22, max:88, singleLine:true, pad:0.96});
+}
+
+function fitAllTeamCards(){
+  document.querySelectorAll('.team-card').forEach(card=> fitTeamCard(card));
+}
+
+
+
+function centerTimer(){
+  const timer = document.getElementById('timer');
+  if(!timer) return;
+  const span = timer.querySelector('span');
+  if(!span) return;
+  // reset transform to measure true geometry
+  span.style.transform = 'translateX(0px)';
+  const tr = timer.getBoundingClientRect();
+  const sr = span.getBoundingClientRect();
+  const leftMargin = 2, rightMargin = 6; // keep in sync with ensureTimerFits()
+  const leftGap  = sr.left - (tr.left + leftMargin);
+  const rightGap = (tr.right - rightMargin) - sr.right;
+  let delta = Math.round((rightGap - leftGap) / 2);
+    const biasPx = 6; delta += biasPx; // clamp so we never violate margins
+  const maxRightShift = (tr.right - rightMargin) - sr.right; // +X
+  const maxLeftShift  = sr.left - (tr.left + leftMargin);     // -X
+  if (delta >  maxRightShift) delta =  maxRightShift;
+  if (delta < -maxLeftShift)  delta = -maxLeftShift;
+  span.style.transform = `translateX(${delta}px)`;
+}
+function ensureTimerFits(){
+  const timer = document.getElementById('timer');
+  if(!timer) return;
+  const span = timer.querySelector('span');
+  if(!span) return;
+  let fs = parseFloat(getComputedStyle(span).fontSize) || 10;
+  // Shrink only if needed to avoid clipping on the right / too tall
+  for(let i=0;i<12;i++){
+    const tr = timer.getBoundingClientRect();
+    const sr = span.getBoundingClientRect();
+    if (sr.right <= tr.right - 6 && sr.left >= tr.left + 2 && sr.height <= tr.height) break;
+    fs -= 1;
+    if (fs < 8) break;
+    span.style.fontSize = fs + 'px';
+  }
+}
+
+function updateTimerDisplay(s){
+  const span=document.querySelector('#timer span');
+  let m=Math.floor(s/60), sec=s%60;
+  span.textContent=(m<10?'0'+m:m)+':' + (sec<10?'0'+sec:sec);
+}
+
+// Re-ensure fit after changing digits
+try{ ensureTimerFits(); }catch(e){}; try{ centerTimer(); }catch(e){};function calcTimerFontSize(){
+  const timer = document.getElementById('timer');
+  const span = timer.querySelector('span');
+  if(!timer || !span) return;
+
+  // Create a hidden measurement clone using a widest sample "88:88"
+  let ghost = document.createElement('span');
+  ghost.textContent = '88:88';
+  ghost.style.visibility = 'hidden';
+  ghost.style.position = 'absolute';
+  ghost.style.whiteSpace = 'nowrap';
+  ghost.style.lineHeight = '1';
+  ghost.style.left = '-9999px';
+  ghost.style.top = '-9999px';
+  ghost.style.textShadow = getComputedStyle(span).textShadow;
+  ghost.style.fontFamily = getComputedStyle(span).fontFamily;
+  document.body.appendChild(ghost);
+
+  // Iteratively find largest font-size that fits inside timer box (with 4% padding)
+  const maxW = timer.clientWidth * 0.94;
+  const maxH = timer.clientHeight * 0.96;
+  let lo = 10, hi = Math.max(24, Math.min(timer.clientHeight, window.innerWidth)), best = 10;
+  for(let i=0;i<18;i++){
+    const mid = Math.floor((lo+hi)/2);
+    ghost.style.fontSize = mid + 'px';
+    const fits = (ghost.scrollWidth <= maxW) && (ghost.scrollHeight <= maxH);
+    if(fits){ best = mid; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  TIMER_FONT_PX = best;
+  span.style.fontSize = best + 'px';
+  // Safety pass to avoid iPad clipping
+  ensureTimerFits();
+  // Then center visually within margins
+  centerTimer();
+
+  // Clean up
+document.body.removeChild(ghost);
+}
+
+/* ---------- Timer engine ---------- */
+function startTimer(){
+  if(timerInterval) return;
+  timerInterval=setInterval(()=>{
+    if(timerSeconds>0){
+      timerSeconds--; updateTimerDisplay(timerSeconds);
+      if(timerSeconds===10 && flashEnabled){ autoFlashMode=true; startFlashing(); }
+    } else {
+      clearInterval(timerInterval); timerInterval=null;
+      document.getElementById('startStop').innerText='Start';
+      autoFlashMode=false; stopFlashing();
+      if(buzzerEnabled){ try{ pauseSpotifyIfPlaying && pauseSpotifyIfPlaying(); }catch(e){}; document.getElementById('buzzer').play(); }
+    }
+  },1000);
+}
+function stopTimer(){ clearInterval(timerInterval); timerInterval=null; document.getElementById('startStop').innerText='Start'; autoFlashMode=false; stopFlashing(); }
+function toggleTimer(){ if(timerInterval){ stopTimer(); } else { startTimer(); document.getElementById('startStop').innerText='Stop'; } }
+
+/* ---------- Score Editor (Keypad) ---------- */
+function initScoreModal(){
+  scoreEditor = document.getElementById('scoreEditor');
+  scoreInput = document.getElementById('scoreInput');
+  scoreSaveBtn = document.getElementById('scoreSave');
+  scoreCancelBtn = document.getElementById('scoreCancel');
+
+  function setVal(v){ scoreInput.value = v; }
+  function getVal(){ return (scoreInput.value||'').trim(); }
+  function appendDigit(d){ let v = getVal(); setVal(v + d); }
+  function backspace(){ setVal(getVal().slice(0,-1)); }
+  function toggleSign(){ let v=getVal(); if(v.startsWith('-')) setVal(v.slice(1)); else setVal(v===''?'-':'-'+v); }
+  function plus(delta){ let v=parseInt(getVal()||'0',10); if(isNaN(v)) v=0; setVal(String(v+delta)); }
+
+  scoreEditor.querySelectorAll('.kp[data-k]').forEach(btn=>{ btn.addEventListener('click', ()=> appendDigit(btn.getAttribute('data-k')), {passive:true}); });
+  document.getElementById('kp-back').addEventListener('click', backspace, {passive:true});
+  document.getElementById('kp-sign').addEventListener('click', toggleSign, {passive:true});
+  document.getElementById('kp-minus1').addEventListener('click', ()=> plus(-1), {passive:true});
+  document.getElementById('kp-plus1').addEventListener('click', ()=> plus(1), {passive:true});
+  document.getElementById('kp-clear').addEventListener('click', ()=> setVal(''), {passive:true});
+
+  scoreSaveBtn.onclick = ()=>{ if(!scoreTargetEl) return closeScoreEditor(); const v=getVal(); if(/^[-]?\d+$/.test(v)){ scoreTargetEl.innerText=parseInt(v,10); } closeScoreEditor(); };
+  scoreCancelBtn.onclick = closeScoreEditor;
+  scoreEditor.addEventListener('click', (e)=>{ if(e.target===scoreEditor) closeScoreEditor(); });
+}
+function openScoreEditor(targetEl){
+  scoreTargetEl = targetEl;
+  const current = (targetEl.innerText||'').replace(/[^-\d]/g,'');
+  document.getElementById('scoreInput').value = current;
+  document.getElementById('scoreEditor').style.display='flex';
+  setTimeout(()=>{ try{ document.getElementById('scoreInput').focus(); }catch(e){} }, 0);
+}
+function closeScoreEditor(){
+  document.getElementById('scoreEditor').style.display='none';
+  scoreTargetEl=null;
+}
+
+/* ---------- Flashing ---------- */
+function startFlashing(){
+  if(!autoFlashMode || !flashEnabled || flashingInterval) return;
+  const columns=document.querySelectorAll('.left,.center,.right');
+  let on=false; const ms=(flashSpeed==='F')?100:(flashSpeed==='S'?1000:500);
+  flashingInterval=setInterval(()=>{
+    const base = getComputedStyle(document.body).backgroundColor || '#111';
+    columns.forEach(el=> el.style.backgroundColor = on ? base : flashColor);
+    on=!on;
+  }, ms);
+}
+function stopFlashing(){
+  clearInterval(flashingInterval); flashingInterval=null;
+  const base = getComputedStyle(document.body).backgroundColor || '#111';
+  document.querySelectorAll('.left,.center,.right').forEach(el=>{ el.style.backgroundColor=base; });
+}
+
+/* ---------- Color toolbox ---------- */
+const PALETTE=[
+  "#FFFFFF","#000000","#FF0000","#CC0000","#990000","#FF6B6B","#FF8A80",
+  "#00FF00","#00CC00","#008000","#2ECC71","#66BB6A","#A5D6A7",
+  "#0000FF","#0044CC","#002366","#00A2FF","#64B5F6","#90CAF9",
+  "#FFD700","#FFC107","#FFB300","#FFA000","#FFE082","#FFF59D",
+  "#FFA500","#FF6B00","#FF8C00","#FFAB40",
+  "#800080","#AA00FF","#9C27B0","#CE93D8","#E1BEE7",
+  "#FF00FF","#F06292","#EC407A","#F48FB1",
+  "#00FFFF","#00B8D4","#008B8B","#40E0D0","#80DEEA",
+  "#808080","#A9A9A9","#BDBDBD","#D3D3D3",
+  "#8B4513","#A0522D","#6D4C41","#BCAAA4","#D7CCC8",
+  "#673AB7","#3F51B5","#5C6BC0","#7986CB",
+  "#4CAF50","#81C784","#388E3C","#1B5E20",
+  "#F44336","#E57373","#B71C1C","#D32F2F",
+  "#FFEB3B","#FFF176","#FDD835","#FBC02D",
+  "#03A9F4","#4FC3F7","#0288D1","#0277BD",
+  "#009688","#26A69A","#80CBC4","#004D40",
+  "#795548","#A1887F","#8D6E63","#5D4037"
+];
+function buildSwatches(){
+  const swatchesEl=document.getElementById('swatches');
+  swatchesEl.innerHTML='';
+  PALETTE.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='swatch'; d.style.background=c;
+    d.addEventListener('click',()=>{ applyColor(toolboxTarget,c); closeToolbox(); }, {passive:true});
+    swatchesEl.appendChild(d);
+  });
+}
+let toolboxTarget='bg';
+function openToolbox(target){
+  toolboxTarget=target;
+  document.getElementById('toolboxTitle').textContent = target==='bg' ? 'Pick a BACKGROUND color' : 'Pick a FLASH color';
+  document.getElementById('hexInput').value='';
+  document.getElementById('colorToolbox').style.display='flex';
+}
+function closeToolbox(){ document.getElementById('colorToolbox').style.display='none'; }
+function applyColor(target,c){
+  if(target==='bg'){
+    document.body.style.backgroundColor=c;
+    document.querySelectorAll('.left,.center,.right').forEach(el=> el.style.backgroundColor=c);
+  } else { flashColor=c; }
+}
+
+/* ---------- Teams ---------- */
+const teamSlots=["team1","team2","team3","team4","team5","team6"];
+const teamColors=["blue","red","green","yellow","#FF6B00","purple"];
+function addTeam(){
+  if(teamCount>=6) return;
+  const slot = document.getElementById(teamSlots[teamCount]);
+  const card=document.createElement('div');
+  card.className='team-card';
+  card.style.backgroundColor=teamColors[teamCount]||'gray';
+  card.innerHTML=`
+    <div class="card-buttons">
+      <button class="reset-score">↺</button>
+      <button class="reset-name">↻</button>
+      <button class="delete">X</button>
+    </div>
+    <div class="team-name" contenteditable="true">Team ${teamCount+1}</div>
+    <div class="score-area">
+      <button class="score-btn">-</button>
+      <div class="score">0</div>
+      <button class="score-btn">+</button>
+    </div>`;
+  slot.appendChild(card);
+  attachTeamCardEvents(card);
+  fitTeamCard(card);
+teamCount++;
+}
+
+function attachTeamCardEvents(card){
+  const name = card.querySelector('.team-name');
+  const scoreEl = card.querySelector('.score');
+
+  // Require hold on risky actions
+  addHoldToConfirm(card.querySelector('.reset-score'), ()=>{ scoreEl.innerText='0'; fitTeamCard(card); });
+  addHoldToConfirm(card.querySelector('.reset-name'),  ()=>{ name.innerText='Team'; fitTeamCard(card); });
+  addHoldToConfirm(card.querySelector('.delete'),      ()=>{ card.remove(); teamCount=Math.max(0,teamCount-1); });
+
+  // +/- buttons stay instant, then refit
+  const btns = card.querySelectorAll('.score-btn');
+  if(btns && btns.length>=2){
+    btns[0].onclick = ()=>{ scoreEl.innerText = (parseInt(scoreEl.innerText)||0) - 1; fitTeamCard(card); };
+    btns[1].onclick = ()=>{ scoreEl.innerText = (parseInt(scoreEl.innerText)||0) + 1; fitTeamCard(card); };
+  }
+
+  // Click score to open editor
+  if (typeof openScoreEditor === 'function') {
+    scoreEl.onclick = ()=> openScoreEditor(scoreEl);
+    const editBtn = card.querySelector('.edit-score');
+    if(editBtn){ editBtn.onclick = ()=> openScoreEditor(scoreEl); }
+  }
+
+  // Refit on team-name typing
+  if(name){
+    name.addEventListener('input', ()=> fitTeamCard(card), {passive:true});
+  }
+
+  // Initial fit
+  fitTeamCard(card);
+}
+
+
+/* ---------- Init & wiring ---------- */
+function initAll(){
+  buildSwatches();
+  updateTimerDisplay(0);
+  calcTimerFontSize(); // set once so it won't jitter per tick
+
+  // Recalculate only when size context changes
+  window.addEventListener('resize', ()=>{ calcTimerFontSize(); centerTimer(); });
+  window.addEventListener('orientationchange', ()=>{ calcTimerFontSize(); centerTimer(); });
+
+  document.getElementById('startStop').onclick=toggleTimer;
+  document.getElementById('reset').onclick=()=>{ stopTimer(); timerSeconds=lastSetTime; updateTimerDisplay(timerSeconds); };
+
+  document.getElementById('addTeam').onclick=addTeam;
+  document.getElementById('background').onclick=()=> openToolbox('bg');
+  document.getElementById('flashColor').onclick=()=> openToolbox('flash');
+  document.getElementById('applyHex').onclick=()=>{
+    const v=document.getElementById('hexInput').value.trim();
+  };
+  document.getElementById('closeToolbox').onclick=closeToolbox;
+
+  document.getElementById('playHorn').onclick=()=>{ const a=document.getElementById('buzzer'); try{ a.currentTime=0; }catch(e){}; a.play(); };
+  document.getElementById('toggleBuzzer').onclick=()=>{
+    buzzerEnabled=!buzzerEnabled;
+    document.getElementById('toggleBuzzer').innerText=buzzerEnabled?'Buzzer: On':'Buzzer: Off';
+  };
+  document.getElementById('toggleFlash').onclick=()=>{
+    flashEnabled=!flashEnabled;
+    document.getElementById('toggleFlash').innerText=flashEnabled?'Flash: On':'Flash: Off';
+    if(!flashEnabled){ autoFlashMode=false; stopFlashing(); }
+  };
+  document.getElementById('flashSpeed').onclick=()=>{
+    if(flashSpeed==='M'){ flashSpeed='F'; document.getElementById('flashSpeed').innerText='Speed: F'; }
+    else if(flashSpeed==='F'){ flashSpeed='S'; document.getElementById('flashSpeed').innerText='Speed: S'; }
+    else { flashSpeed='M'; document.getElementById('flashSpeed').innerText='Speed: M'; }
+  };
+
+  // Timer input & presets
+  document.getElementById('timer').onclick=()=>{
+    let input=prompt('Enter time (MM:SS or seconds):',document.querySelector('#timer span').innerText);
+    if(input!==null){
+      input=input.trim();
+      if(input.includes(':')){ let [m,s]=input.split(':'); timerSeconds=(parseInt(m)||0)*60 + (parseInt(s)||0); }
+      else { timerSeconds=parseInt(input)||0; }
+      lastSetTime=timerSeconds; updateTimerDisplay(timerSeconds);
+      // Font size remains fixed (no jitter), but if format length changes drastically, you can uncomment next line:
+      // calcTimerFontSize();
+    }
+  };
+  function setPreset(sec){ timerSeconds=sec; lastSetTime=sec; updateTimerDisplay(timerSeconds); }
+  document.getElementById('preset30').onclick=()=> setPreset(30);
+  document.getElementById('preset60').onclick=()=> setPreset(60);
+  document.getElementById('preset120').onclick=()=> setPreset(120);
+  document.getElementById('preset180').onclick=()=> setPreset(180);
+  document.getElementById('preset300').onclick=()=> setPreset(300);
+
+  // Title size
+  let titleEl=document.getElementById('title'); let titleSize=3;
+  document.getElementById('title-decrease').onclick=()=>{ titleSize=Math.max(1,titleSize-0.2); titleEl.style.fontSize=titleSize+'vw'; };
+  document.getElementById('title-increase').onclick=()=>{ titleSize+=0.2; titleEl.style.fontSize=titleSize+'vw'; };
+
+  // Spacebar toggle (disabled when editor open)
+  window.addEventListener('keydown', (e)=>{
+    const editorVisible = (document.getElementById('scoreEditor') && document.getElementById('scoreEditor').style.display === 'flex');
+    if(editorVisible) return;
+    const t = e.target;
+    const isEditable = t && (
+      (t.getAttribute && t.getAttribute('contenteditable') === 'true') ||
+      (t.tagName === 'INPUT') ||
+      (t.tagName === 'TEXTAREA')
+    );
+    if(isEditable) return;
+    if(e.code==='Space' || e.key===' ' || e.key==='Spacebar'){
+      e.preventDefault();
+      if (typeof toggleTimer === 'function') toggleTimer();
+    }
+  }, {passive:false});
+
+  // Score modal
+  initScoreModal();
+
+  // PWA
+  if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('service-worker.js'); }catch(e){} }
+}
+
+
+window.addEventListener('resize', ()=>{ try{ fitAllTeamCards(); }catch(e){} }, {passive:true});
+window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ try{ fitAllTeamCards(); }catch(e){} }, 80); }, {passive:true});
+document.addEventListener('DOMContentLoaded', initAll);
+
+
+// Settings toolbox handlers
+document.getElementById('openSettings').onclick = ()=>{
+  document.getElementById('settingsToolbox').style.display='flex';
+};
+document.getElementById('closeSettings').onclick = ()=>{
+  document.getElementById('settingsToolbox').style.display='none';
+};
+
+
+  // Settings modal open/close
+  const settingsModal = document.getElementById('settingsModal');
+  const openSettingsBtn = document.getElementById('openSettings');
+  const closeSettingsBtn = document.getElementById('closeSettings');
+  if(openSettingsBtn){ openSettingsBtn.onclick = ()=>{ settingsModal.style.display='flex'; setTimeout(calcTimerFontSize, 50); }; }
+  if(closeSettingsBtn){ closeSettingsBtn.onclick = ()=>{ settingsModal.style.display='none'; setTimeout(calcTimerFontSize, 50); }; }
+  if(settingsModal){ settingsModal.addEventListener('click', (e)=>{ if(e.target===settingsModal){ settingsModal.style.display='none'; setTimeout(calcTimerFontSize, 50); } }); }
+
+
+  // --- Settings modal UX fixes ---
+  (function(){
+    const settingsModal = document.getElementById('settingsModal');
+    const openSettingsBtn = document.getElementById('openSettings');
+    const closeSettingsBtn = document.getElementById('closeSettings');
+    const bgBtn = document.getElementById('background');
+    const flashColorBtn = document.getElementById('flashColor');
+
+    function openSettings(){
+      if(settingsModal){ settingsModal.style.display='flex'; }
+      setTimeout(calcTimerFontSize, 50);
+    }
+    function closeSettings(){
+      if(settingsModal){ settingsModal.style.display='none'; }
+      setTimeout(calcTimerFontSize, 50);
+    }
+
+    if(openSettingsBtn){ openSettingsBtn.onclick = openSettings; }
+    if(closeSettingsBtn){ closeSettingsBtn.onclick = closeSettings; }
+
+    // Click-outside to close
+    if(settingsModal){
+      settingsModal.addEventListener('click', (e)=>{
+        if(e.target === settingsModal){ closeSettings(); }
+      });
+    }
+    // ESC to close
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape'){ closeSettings(); }
+    });
+
+    // Ensure color toolboxes appear above Settings by closing Settings before opening
+    if(bgBtn){
+      bgBtn.onclick = ()=>{ closeSettings(); setTimeout(()=> openToolbox('bg'), 20); };
+    }
+    if(flashColorBtn){
+      flashColorBtn.onclick = ()=>{ closeSettings(); setTimeout(()=> openToolbox('flash'), 20); };
+    }
+  })();
+
+
+
+  // Settings bottom sheet logic
+  (function(){
+    const settingsModal = document.getElementById('settingsModal');
+    const sheet = settingsModal ? settingsModal.querySelector('.sheet') : null;
+    const openSettingsBtn = document.getElementById('openSettings');
+    const closeSettingsBtn = document.getElementById('closeSettings');
+    const bgBtn = document.getElementById('background');
+    const flashColorBtn = document.getElementById('flashColor');
+
+    function openSettings(){
+      if(!settingsModal) return;
+      settingsModal.style.display='flex';
+      if(sheet){
+        sheet.style.animation='none'; void sheet.offsetHeight; sheet.style.animation='settings-slide-up .25s ease-out forwards';
+      }
+      setTimeout(calcTimerFontSize, 50);
+    }
+    function closeSettings(){
+      if(!settingsModal) return;
+      settingsModal.style.display='none';
+      setTimeout(calcTimerFontSize, 50);
+    }
+
+    if(openSettingsBtn){ openSettingsBtn.onclick = openSettings; }
+    if(closeSettingsBtn){ closeSettingsBtn.onclick = closeSettings; }
+
+    if(settingsModal){
+      settingsModal.addEventListener('click', (e)=>{ if(e.target === settingsModal){ closeSettings(); } });
+    }
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape'){ closeSettings(); } });
+
+    if(bgBtn){ bgBtn.onclick = ()=>{ closeSettings(); setTimeout(()=> openToolbox('bg'), 20); }; }
+    if(flashColorBtn){ flashColorBtn.onclick = ()=>{ closeSettings(); setTimeout(()=> openToolbox('flash'), 20); }; }
+  })();
+
+
+
+
+
+
+
+// ----- Settings modal bottom sheet logic -----
+(function(){
+  const settingsModal = document.getElementById('settingsModal');
+  if(!settingsModal) return;
+  const sheet = settingsModal.querySelector('.sheet');
+  const closeBtn = document.getElementById('closeSettings');
+  const openBtn = document.getElementById('openSettings');
+  const bgBtn = document.getElementById('background');
+  const flashColorBtn = document.getElementById('flashColor');
+
+  function openSettings(){
+    settingsModal.style.display = 'flex';
+    if(sheet){
+      sheet.style.animation='none'; void sheet.offsetHeight;
+      sheet.style.animation='settings-slide-up .25s ease-out forwards';
+    }
+    setTimeout(calcTimerFontSize, 50);
+  }
+  function closeSettings(){
+    settingsModal.style.display = 'none';
+    setTimeout(calcTimerFontSize, 50);
+  }
+
+  if(openBtn) openBtn.onclick = openSettings;
+  if(closeBtn) closeBtn.onclick = (e)=>{ e.stopPropagation(); closeSettings(); };
+
+  // Backdrop click closes, sheet stops propagation
+  settingsModal.addEventListener('click', closeSettings);
+  if(sheet){
+    sheet.addEventListener('click', (e)=> e.stopPropagation());
+  }
+
+  // ESC key closes
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSettings(); });
+
+  // Background / Flash buttons close settings first, then open toolbox
+  if(bgBtn){
+    bgBtn.addEventListener('click', (e)=>{ e.stopPropagation(); closeSettings(); setTimeout(()=> openToolbox('bg'), 200); });
+  }
+  if(flashColorBtn){
+    flashColorBtn.addEventListener('click', (e)=>{ e.stopPropagation(); closeSettings(); setTimeout(()=> openToolbox('flash'), 200); });
+  }
+})();
+// ----- End Settings modal bottom sheet logic -----
+
+
+// Settings bottom sheet robust wiring
+(function(){
+  const modal = document.getElementById('settingsModal');
+  const sheet = modal ? modal.querySelector('.sheet') : null;
+  const btnOpen = document.getElementById('openSettings');
+  const btnClose = document.getElementById('closeSettings');
+  const bgBtn = document.getElementById('background');
+  const flashBtn = document.getElementById('flashColor');
+
+  function openSettings(){
+    if(!modal) return;
+    modal.style.display='flex';
+    if(sheet){
+      sheet.style.animation='none'; void sheet.offsetHeight; sheet.style.animation='settings-slide-up .25s ease-out forwards';
+    }
+    setTimeout(calcTimerFontSize, 50);
+  }
+  function closeSettings(){
+    if(!modal) return;
+    modal.style.display='none';
+    setTimeout(calcTimerFontSize, 50);
+  }
+
+  if(btnOpen) btnOpen.addEventListener('click', openSettings);
+  if(btnClose) btnClose.addEventListener('click', closeSettings);
+
+  // Backdrop closes
+  if(modal) modal.addEventListener('click', closeSettings);
+  // Prevent backdrop close for clicks inside sheet
+  if(sheet) sheet.addEventListener('click', (e)=>{ e.stopPropagation(); });
+
+  // ESC closes
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSettings(); });
+
+  // Rebind color buttons to close settings first
+  if(bgBtn){
+    bgBtn.replaceWith(bgBtn.cloneNode(true)); // drop previous onclick
+  }
+  if(flashBtn){
+    flashBtn.replaceWith(flashBtn.cloneNode(true));
+  }
+  const bg = document.getElementById('background');
+  const flash = document.getElementById('flashColor');
+  if(bg) bg.addEventListener('click', ()=>{ closeSettings(); setTimeout(()=> openToolbox('bg'), 20); });
+  if(flash) flash.addEventListener('click', ()=>{ closeSettings(); setTimeout(()=> openToolbox('flash'), 20); });
+})();
+
+
+
+// Robust Settings modal logic
+(function(){
+  const modal = document.getElementById('settingsModal');
+  if(!modal) return;
+  const sheet = modal.querySelector('.sheet');
+  const btnOpen = document.getElementById('openSettings');
+  const btnClose = document.getElementById('closeSettings');
+  function openSettings(){
+    modal.style.display='flex';
+    if(sheet){ sheet.style.animation='none'; void sheet.offsetHeight; sheet.style.animation='settings-slide-up .25s ease-out forwards'; }
+  }
+  function closeSettings(){ modal.style.display='none'; }
+  if(btnOpen) btnOpen.onclick = openSettings;
+  if(btnClose) btnClose.onclick = closeSettings;
+  modal.addEventListener('click', closeSettings);
+  if(sheet){ sheet.addEventListener('click', e=> e.stopPropagation()); }
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeSettings(); });
+  // Hook color pickers
+  const bg=document.getElementById('background');
+  const flash=document.getElementById('flashColor');
+  if(bg) bg.onclick=()=>{ closeSettings(); setTimeout(()=>openToolbox('bg'),50); };
+  if(flash) flash.onclick=()=>{ closeSettings(); setTimeout(()=>openToolbox('flash'),50); };
+})();
+
+</script>
+
+<!-- Settings Toolbox Modal -->
+<div id="settingsToolbox" aria-modal="true" role="dialog"
+     style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); z-index:10000;">
+  <div style="background:#222; color:#fff; padding:16px; border-radius:14px; width:min(92vw, 480px); box-shadow:0 10px 30px rgba(0,0,0,.6);">
+    <div style="text-align:center; font-size:24px; margin-bottom:10px;">Settings</div>
+    <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">
+      <button id="background">Background</button>
+      <button id="playHorn" title="Horn">Horn</button>
+      <button id="toggleBuzzer">Buzzer: On</button>
+      <button id="toggleFlash">Flash: On</button>
+      <button id="flashColor">Flash Color</button>
+      <button id="flashSpeed">Speed: M</button>
+    </div>
+    <div style="text-align:center; margin-top:12px;">
+      <button id="closeSettings">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// Auto-resume after buzzer ends (robust)
+(function(){
+  function wantAuto(){ try { return (localStorage.getItem('spotifyAutoResume') ?? '1') === '1'; } catch(e){ return true; } }
+  function markIntent(){ try { sessionStorage.setItem('spotifyResumeIntent','1'); } catch(e){} }
+  function clearIntent(){ try { sessionStorage.removeItem('spotifyResumeIntent'); } catch(e){} }
+
+  // Attach intent marking to horn button and when timer hits zero (if present)
+  window.addEventListener('DOMContentLoaded', ()=>{
+    const horn = document.getElementById('playHorn');
+    if(horn){
+      const prev = horn.onclick;
+      horn.onclick = function(ev){
+        try{ markIntent(); }catch(e){}
+        if(prev) return prev.call(this, ev);
+      };
+    }
+    // Attach ended handler on buzzer for resume
+    const buzzerEl = document.getElementById('buzzer');
+    if(buzzerEl && !buzzerEl._resumeBound){
+      buzzerEl._resumeBound = true;
+      buzzerEl.addEventListener('ended', async ()=>{
+        try {
+          const intent = sessionStorage.getItem('spotifyResumeIntent') === '1';
+          if(wantAuto() || intent){
+            // Try resume
+            if(typeof api === 'function'){
+              try{ await api('PUT','/me/player/play'); }catch(e){}
+            }
+          }
+        } finally {
+          clearIntent();
+        }
+      });
+    }
+  });
+})();
+</script>
+
+
+<script>
+// Wire Auto-Resume toggle
+(function(){
+  function getOn(){ try { return (localStorage.getItem('spotifyAutoResume') ?? '1') === '1'; } catch(e){ return true; } }
+  function setOn(v){ try { localStorage.setItem('spotifyAutoResume', v ? '1':'0'); } catch(e){} }
+  window.addEventListener('DOMContentLoaded', ()=>{
+    const btn = document.getElementById('spotifyAutoResume');
+    if(!btn) return;
+    const apply = ()=>{ btn.textContent = 'Auto-Resume: ' + (getOn() ? 'On' : 'Off'); };
+    apply();
+    btn.addEventListener('click', ()=>{
+      setOn(!getOn());
+      apply();
+      try{ /* light feedback */ btn.style.transform='scale(0.98)'; setTimeout(()=>btn.style.transform='',110); }catch(e){}
+    });
+  });
+})();
+</script>
+
+
+<script>
+// --- Title Font Size Controls (Settings Toolbox) ---
+(function(){
+  const titleEl = document.getElementById('title');
+  if(!titleEl) return;
+
+  // restore from localStorage if present
+  const saved = localStorage.getItem('titleFontPt');
+  if(saved){
+    const pt = parseInt(saved, 10);
+    if(!isNaN(pt)) titleEl.style.setProperty('font-size', pt + 'pt', 'important');
+  }
+
+  function getCurrentPt(){
+    const stored = parseInt(localStorage.getItem('titleFontPt')||'', 10);
+    if(!isNaN(stored)) return stored;
+    const px = parseFloat(getComputedStyle(titleEl).fontSize) || 32;
+    return Math.round(px * 72 / 96);
+  }
+
+  function setPt(pt){
+    const clamped = Math.max(10, Math.min(200, pt));
+    titleEl.style.setProperty('font-size', clamped + 'pt', 'important');
+    localStorage.setItem('titleFontPt', String(clamped));
+  }
+
+  function adjust(delta){ if(!titleEl) return; setPt(getCurrentPt() + delta); }
+
+  window.addEventListener('DOMContentLoaded', ()=>{
+    const minus = document.getElementById('titleFontMinus');
+    const plus  = document.getElementById('titleFontPlus');
+    if(minus) minus.addEventListener('click', ()=> adjust(-5));
+    if(plus)  plus .addEventListener('click', ()=> adjust(+5));
+  });
+})();
+</script>
+
+
+<script>
+// Minimal storage for Spotify Client ID (until main Spotify block is present)
+(function(){
+  window.addEventListener('DOMContentLoaded', ()=>{
+    const setIdBtn = document.getElementById('spotifySetClientId');
+    if(setIdBtn){
+      setIdBtn.addEventListener('click', ()=>{
+        const cur = localStorage.getItem('SPOTIFY_CLIENT_ID') || '';
+        const next = prompt('Enter your Spotify Client ID:', cur);
+        if(next){ localStorage.setItem('SPOTIFY_CLIENT_ID', next.trim()); alert('Saved.'); }
+      });
+    }
+  });
+})();
+</script>
+
+
+<script>
+// Auto-fit the title on first load so it fits on one line in the center column.
+(function(){
+  function fitTitleToOneLine(opts){
+    const el = document.getElementById('title');
+    if(!el) return;
+    const container = el.parentElement || el;
+    const min = (opts && opts.min) || 10;
+    const max = (opts && opts.max) || 200;
+    // Ensure single line + no overflow
+    el.style.whiteSpace = 'nowrap';
+    el.style.overflow = 'hidden';
+    el.style.textOverflow = 'ellipsis';
+    // Binary search for largest pt size that fits container width
+    let lo = min, hi = max, best = min;
+    for(let i=0;i<12;i++){ // ~log2(200) steps
+      const mid = Math.floor((lo + hi) / 2);
+      el.style.setProperty('font-size', mid + 'pt', 'important');
+      // Force reflow and check
+      const fits = el.scrollWidth <= container.clientWidth;
+      if(fits){ best = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+    el.style.setProperty('font-size', best + 'pt', 'important');
+    try { localStorage.setItem('titleFontPt', String(best)); } catch(e){}
+  }
+  window.addEventListener('DOMContentLoaded', ()=>{
+    try {
+      // Only run if user hasn't already chosen a size
+      if(!localStorage.getItem('titleFontPt')) fitTitleToOneLine({min: 10, max: 200});
+    } catch(e){}
+  });
+})();
+</script>
+
+</body>
+</html>
